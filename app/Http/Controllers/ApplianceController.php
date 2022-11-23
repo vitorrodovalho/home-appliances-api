@@ -14,7 +14,7 @@ class ApplianceController extends Controller
      *
      * @return
      */
-    public function index(Request $request)
+    /*public function index(Request $request)
     {
         $qb = Appliance::query();
 
@@ -47,6 +47,60 @@ class ApplianceController extends Controller
             $qb->where('id', '<=', $request->max_id);
 
         return $qb->paginate($page_size);
+    }*/
+
+    public function index(Request $request)
+    {
+        $columns = array(
+            0 =>'id',
+            1 =>'name',
+            2=> 'description',
+            3=> 'voltage'
+        );
+
+        $totalData = Appliance::count();
+        $totalFiltered = $totalData;
+
+        $limit = $request->has('length') ? $request->input('length') : 20;
+        $start = $request->has('start') ? $request->input('start') : 0;
+        $order = $request->has('order.0.column') ? $columns[$request->input('order.0.column')] : 'id';
+        $dir = $request->has('order.0.dir') ? $request->input('order.0.dir') : 'asc';
+        $search = $request->input('search.value');
+
+        $qb = Appliance::query();
+        if(!empty($request->input('search.value')))
+        {
+            $qb->where(function($query) use ($search) {
+                $query->whereRaw("CONCAT_WS(\" \", name,description) REGEXP '{$search}'");
+            });
+        }
+
+        $totalFiltered = $qb->count();
+        $qb->offset($start);
+        $qb->limit($limit);
+        $qb->orderBy($order,$dir);
+        $appliances = $qb->get();
+
+        $data = array();
+        if(!empty($appliances))
+        {
+            foreach ($appliances as $appliance)
+            {
+                $nestedData['id'] = $appliance->id;
+                $nestedData['name'] = $appliance->name;
+                $nestedData['description'] = $appliance->description;
+                $nestedData['voltage'] = $appliance->voltage;
+                $data[] = $nestedData;
+            }
+        }
+
+        $json_data = array(
+            "draw"            => intval($request->input('draw')),
+            "recordsTotal"    => intval($totalData),
+            "recordsFiltered" => intval($totalFiltered),
+            "data"            => $data
+        );
+        return json_encode($json_data);
     }
 
     /**
